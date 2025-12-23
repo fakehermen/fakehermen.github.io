@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Antecedent Checker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Bitcount+Grid+Double&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Roboto', sans-serif; margin: 20px; background-color: #fff; color: #000; transition: background 0.3s, color 0.3s; position: relative; min-height: 100vh; padding-bottom: 40px; }
+    h2 { font-family: 'Bitcount Grid Double', sans-serif; font-size: 50px; margin-bottom: 20px; color: #6D14C4; letter-spacing: 1px; font-weight: bold; }
+
+    .textarea-container { position: relative; width: 100%; }
+    textarea { width: 100%; height: 200px; padding: 12px; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; resize: vertical; box-sizing: border-box; }
+
+    .clear-btn { position: absolute; top: 0px; right: 15px; cursor: pointer; font-size: 16px; color: rgba(0,0,0,0.3); background: transparent; border: none; outline: none; padding: 2px; border-radius: 50%; transition: background 0.3s, color 0.3s; }
+    .clear-btn:hover { background: rgba(0,0,0,0.1); color: rgba(0,0,0,0.5); }
+    body.dark .clear-btn { color: rgba(255,255,255,0.3); }
+    body.dark .clear-btn:hover { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.5); }
+
+    button { padding: 10px 20px; font-size: 16px; margin-top: 15px; cursor: pointer; border-radius: 6px; border: none; background-color: #9900a1; color: #fff; transition: background 0.3s; }
+    button:hover { background-color: #cc007a; }
+    #results { margin-top: 25px; font-size: 16px; white-space: pre-wrap; line-height: 1.6; min-height: 50px; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background-color: #f9f9f9; width: 100%; box-sizing: border-box; }
+    .intro, .resolved, .missing, .skipped { padding: 2px 4px; border-radius: 4px; }
+    .intro { background-color: #c4f7c4; }
+    .resolved { background-color: #a0d8f1; }
+    .missing { background-color: #ffb2b2; }
+    .skipped { background-color: transparent; }
+    .hidden { background-color: transparent; padding: 2px 4px; }
+
+    /* Legend outer box (dynamic width, left-aligned, no border) */
+    .legend { margin-top: 20px; font-size: 14px; display: flex; width: 100%; min-height: 40px; padding: 8px; box-sizing: border-box; justify-content: flex-start; align-items: center; }
+
+    /* Inner container for flexible layout */
+    .legend-inner { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 10px; }
+    .legend-inner span { padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #000; }
+    .intro-legend { background-color: #c4f7c4; }
+    .resolved-legend { background-color: #a0d8f1; }
+    .missing-legend { background-color: #ffb2b2; }
+
+    body.dark { background-color: #1e1e1e; color: #f0f0f0; }
+    body.dark textarea { background-color: #2e2e2e; color: #f0f0f0; }
+    body.dark #results { background-color: #2a2a2a; color: #f0f0f0; }
+    body.dark #advancedOptions { background-color: #2a2a2a; color: #f0f0f0; }
+
+    .switch { position: relative; display: inline-block; width: 50px; height: 24px; margin-right: 10px; vertical-align: middle; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
+    .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+    input:checked + .slider { background-color: #853acf; }
+    input:checked + .slider:before { transform: translateX(26px); }
+
+    label { font-size: 14px; cursor: pointer; user-select: none; }
+    .controls { margin-top: 15px; margin-bottom: 15px; }
+    #wordCount { font-size: 14px; margin-top: 5px; color: #555; }
+    #congrats { text-align: center; margin-top: 20px; }
+    #congrats img { max-width: 300px; border-radius: 10px; }
+    #advancedOptions { max-height: 0; overflow: hidden; transition: max-height 0.5s ease, padding 0.5s ease; margin-top: 10px; border: 1px solid #ccc; padding: 0 10px; border-radius: 6px; background-color: #f3f3f3; }
+    #advancedOptions.show { max-height: 350px; padding: 10px; }
+    #advancedOptions textarea { height: 60px; width: 100%; }
+    #watermark { position: absolute; bottom: 5px; right: 10px; font-size: 12px; color: rgba(0,0,0,0.3); user-select: none; }
+    body.dark #watermark { color: rgba(255,255,255,0.3); }
+    #advArrow { display:inline-block; vertical-align: middle; transition: transform 0.3s; font-size: 14px; margin-left: 5px; }
+
+    @media(max-width:600px){
+      .legend-inner { flex-direction: column; }
+      h2 { font-size: 35px; } 
+      button { font-size: 14px; padding:8px 15px; } 
+      #results { font-size:14px; } 
+    }
+  </style>
+</head>
+<body>
+
+<h2>YaoMing's Antecedent Tool</h2>
+
+<div class="textarea-container">
+  <textarea id="inputText" placeholder="Paste your text here..." oninput="updateWordCount()"></textarea>
+  <button class="clear-btn" title="Clear text" onclick="clearText()">🗑️</button>
+</div>
+<div id="wordCount">Word count: 0</div>
+
+<div class="controls">
+  <label class="switch">
+    <input type="checkbox" id="highlightToggle" checked onchange="renderHighlights()">
+    <span class="slider"></span>
+  </label>
+  Toggle highlight modes
+  <br><br>
+  <button onclick="handleAnalyze()">Analyze</button>
+  <button onclick="toggleAdvanced()">
+    Advanced Options <span id="advArrow">&#9662;</span>
+  </button>
+</div>
+
+<div id="advancedOptions">
+  <label class="switch">
+    <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()">
+    <span class="slider"></span>
+  </label>
+  Dark Mode
+  <br><br>
+  <label>Custom skip words/phrases (comma separated):</label>
+  <textarea id="customSkip" placeholder="e.g. present, the present invention" oninput="renderHighlightsFromInput()"></textarea>
+  <br><br>
+  <label class="switch">
+    <input type="checkbox" id="confettiToggle">
+    <span class="slider"></span>
+  </label>
+  Reduced Motion (less confetti)
+</div>
+
+<div id="results"></div>
+<div id="congrats"></div>
+
+<div class="legend">
+  <div class="legend-inner">
+    <strong>Legend:</strong>
+    <span class="intro-legend">Antecedent Introduction</span>
+    <span class="resolved-legend">Antecedent exists</span>
+    <span class="missing-legend">Missing antecedent</span>
+  </div>
+</div>
+
+<div id="watermark">Vibe coded by Hermen</div>
+
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+<script>
+const skipList = new Set([
+  "same","following","above","below","next","previous","current","overall",
+  "aforementioned","all","both","none","it","its","their","his","her","our",
+  "your","my","mine","yours","ours","theirs","such","this","that","these","those"
+]);
+
+const skipPhrases = [
+  "the same","the following","the above","the below","the aforementioned","the rest",
+  "the remainder","the completion", "the present invention", "the above description", "the following steps"
+];
+
+const numberWords = ["one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen","twenty"];
+
+let highlights = [];
+let originalText = "";
+
+function toggleAdvanced() {
+  const adv = document.getElementById("advancedOptions");
+  const arrow = document.getElementById("advArrow");
+  adv.classList.toggle("show");
+  arrow.style.transform = adv.classList.contains("show") ? "rotate(180deg)" : "rotate(0deg)";
+}
+
+function toggleDarkMode() { document.body.classList.toggle("dark"); renderHighlights(); }
+function singularize(word) { return word.endsWith('s') && word.length > 1 ? word.slice(0,-1) : word; }
+
+/* ====== ANALYSIS LOGIC ====== */
+function analyzeText(text, customSkipInput) {
+  const lower = text.toLowerCase();
+  const customSkip = customSkipInput.toLowerCase().split(',').map(s => s.trim()).filter(s => s.length>0);
+
+  const introRegex = new RegExp(`\\b(a|an|${numberWords.join("|")}|(${numberWords.join("|")})\\s+or\\s+more)\\s+([a-z0-9\\-]+)`, "gi");
+  const aMatches = [...lower.matchAll(introRegex)];
+  const theMatches = [...lower.matchAll(/\bthe\s+([a-z0-9\-]+)/g)];
+  const aSet = new Set(aMatches.map(m => singularize(m[3])));
+
+  const resultHighlights = [];
+
+  skipPhrases.forEach(phrase => {
+    let startIndex = 0;
+    while ((startIndex = lower.indexOf(phrase, startIndex)) !== -1) {
+      resultHighlights.push({ start: startIndex, end: startIndex + phrase.length, type: "skipped" });
+      startIndex += phrase.length;
+    }
+  });
+
+  for (const m of aMatches) { resultHighlights.push({ start: m.index, end: m.index + m[0].length, type: "intro" }); }
+
+  for (const m of theMatches) {
+    const phrase = "the " + m[1];
+    const noun = singularize(m[1]);
+    if (resultHighlights.some(h => (m.index >= h.start && m.index < h.end))) continue;
+    const isCustomSkip = customSkip.includes(phrase) || customSkip.includes(m[1]) || skipList.has(noun);
+    const type = isCustomSkip ? "skipped" : (aSet.has(noun) ? "resolved" : "missing");
+    resultHighlights.push({ start: m.index, end: m.index + m[0].length, type: type });
+  }
+
+  return resultHighlights;
+}
+
+/* ====== HIGHLIGHT RENDERING ====== */
+function getHighlightedHTML(text, highlights, showIntroResolved, isDark) {
+  let highlighted = text;
+  highlights.sort((a,b)=>b.start - a.start);
+
+  for(const r of highlights){
+    let cls = r.type;
+    let color = "#000";
+    if(r.type === "intro" || r.type === "resolved"){ if(!showIntroResolved){ cls += " hidden"; color = isDark ? "#fff" : "#000"; } else color = "#000"; }
+    else if(r.type === "missing"){ color = "#000"; if(!showIntroResolved && isDark) color = "#fff"; }
+    else if(r.type === "skipped"){ color = isDark ? "#fff" : "#000"; }
+
+    const original = highlighted.slice(r.start, r.end);
+    highlighted = highlighted.slice(0,r.start) + `<span class="${cls}" style="color:${color}">` + original + "</span>" + highlighted.slice(r.end);
+  }
+
+  return highlighted;
+}
+
+function renderHighlights() {
+  const showIntroResolved = document.getElementById("highlightToggle").checked;
+  const isDark = document.body.classList.contains("dark");
+  const highlightedHTML = getHighlightedHTML(originalText, highlights, showIntroResolved, isDark);
+  document.getElementById("results").innerHTML = highlightedHTML;
+}
+
+function renderHighlightsFromInput() {
+  highlights = analyzeText(originalText, document.getElementById("customSkip").value);
+  renderHighlights();
+  localStorage.setItem("antecedentCustomSkip", document.getElementById("customSkip").value);
+
+  const missingCount = highlights.filter(h => h.type==="missing").length;
+  if(missingCount === 0){
+    document.getElementById("congrats").innerHTML = `<p>🎉 Congratulations! No missing antecedents detected!</p>
+      <img src="https://i.pinimg.com/originals/4d/b9/cd/4db9cda0b244a2508b846ed918af0271.gif" alt="Congrats!">`;
+    showConfetti();
+  } else { document.getElementById("congrats").innerHTML = ""; }
+}
+
+function handleAnalyze() {
+  originalText = document.getElementById("inputText").value;
+  if(originalText.trim() === ""){ alert("You forgot your text bruh"); return; }
+  localStorage.setItem("antecedentInputText", originalText);
+
+  highlights = analyzeText(originalText, document.getElementById("customSkip").value);
+  renderHighlights();
+  renderHighlightsFromInput();
+  updateWordCount();
+}
+
+function updateWordCount(){
+  const text = document.getElementById("inputText").value.trim();
+  const words = text===""?0:text.split(/\s+/).length;
+  document.getElementById("wordCount").innerText = `Word count: ${words}`;
+  localStorage.setItem("antecedentInputText", text);
+}
+
+function clearText() {
+  document.getElementById("inputText").value = "";
+  originalText = "";
+  highlights = [];
+  document.getElementById("results").innerHTML = "";
+  document.getElementById("wordCount").innerText = "Word count: 0";
+  document.getElementById("congrats").innerHTML = "";
+  localStorage.removeItem("antecedentInputText");
+}
+
+function showConfetti() {
+  const reducedMotion = document.getElementById("confettiToggle").checked;
+  const colors = ['#bb0000','#ffffff','#ffcc00','#00ccff','#ff00ff'];
+  if(reducedMotion){
+    const duration = 3*1000;
+    const end = Date.now()+duration;
+    (function frame(){ confetti({particleCount:5,startVelocity:10,gravity:0.6,ticks:200,origin:{x:Math.random(),y:0},colors:colors});
+    if(Date.now()<end) requestAnimationFrame(frame); })();
+  } else {
+    confetti({particleCount:150,startVelocity:30,spread:160,gravity:0.7,ticks:100,origin:{x:0.3,y:0.6},colors:colors,scalar:1.2});
+    confetti({particleCount:150,startVelocity:30,spread:160,gravity:0.7,ticks:100,origin:{x:0.7,y:0.6},colors:colors,scalar:1.2});
+  }
+}
+
+// Restore cached data on page load
+window.addEventListener("load", () => {
+  const savedText = localStorage.getItem("antecedentInputText");
+  const savedCustomSkip = localStorage.getItem("antecedentCustomSkip");
+  if(savedText) { document.getElementById("inputText").value = savedText; originalText = savedText; updateWordCount(); }
+  if(savedCustomSkip) { document.getElementById("customSkip").value = savedCustomSkip; }
+  if(savedText || savedCustomSkip) { highlights = analyzeText(originalText, document.getElementById("customSkip").value); renderHighlights(); }
+});
+</script>
+</body>
+</html>
